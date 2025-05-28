@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D 비행기 게임</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 50%, #ADD8E6 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-user-select: none; /* Safari */
+            -ms-user-select: none; /* IE 10+ */
+            user-select: none; /* Standard syntax */
+        }
+        #gameContainer {
+            width: 90vw;
+            max-width: 1000px;
+            height: 85vh;
+            position: relative;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            /* cursor: pointer;  오디오 시작은 메시지 클릭으로 변경 */
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 15px;
+        }
+        .ui-element {
+            position: absolute;
+            color: #fff;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+            padding: 10px 15px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+        #scoreBoard { top: 20px; left: 20px; font-size: 22px; }
+        #livesBoard { top: 20px; right: 20px; font-size: 22px; }
+        #timerDisplay { 
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 28px; 
+            color: #FFD700; 
+            font-weight: bold;
+            animation: pulseTimer 1.5s infinite alternate; 
+        }
+        #debugInfo { 
+            top: 70px; 
+            left: 20px; 
+            font-size: 14px; 
+            color: #FFD700;
+            background-color: rgba(0,0,0,0.5); 
+            padding: 5px; 
+            border-radius: 5px;
+        }
+        #controlsMessage { bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 16px; text-align: center; display: none; /* 모바일에서는 숨김 처리 */}
+        #audioStartMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+            padding: 20px;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            z-index: 101; 
+            cursor: pointer;
+        }
+        #gameOverScreen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.75); color: white;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; z-index: 100; border-radius: 15px;
+        }
+        #gameOverScreen h2 { font-size: 48px; margin-bottom: 20px; color: #FFD700; }
+        #gameOverScreen p { font-size: 24px; margin-bottom: 15px; } 
+        #finalTimeDisplay { font-size: 20px; margin-bottom: 30px; color: #87CEFA; } 
+        #restartButton {
+            padding: 15px 30px; font-size: 20px; background-color: #FFD700;
+            color: #333; border: none; border-radius: 10px; cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        #restartButton:hover { background-color: #FFA500; }
+        #restartButton:active { transform: scale(0.95); }
+
+        @keyframes pulseTimer {
+            0% { transform: translateX(-50%) scale(1); opacity: 0.9; }
+            50% { transform: translateX(-50%) scale(1.05); opacity: 1; color: #FFFACD; } 
+            100% { transform: translateX(-50%) scale(1); opacity: 0.9;}
+        }
+
+        /* 모바일 조작 버튼 스타일 */
+        #mobileControls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 10px;
+            width: 180px; /* 버튼 영역 너비 */
+            height: 180px; /* 버튼 영역 높이 */
+            z-index: 50;
+        }
+        .control-button {
+            background-color: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%; /* 원형 버튼 */
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            -webkit-tap-highlight-color: transparent; /* 터치 시 하이라이트 제거 */
+        }
+        .control-button:active {
+            background-color: rgba(255, 255, 255, 0.6);
+        }
+        /* 버튼 위치 지정 */
+        #btnUp { grid-column: 2; grid-row: 1; }
+        #btnLeft { grid-column: 1; grid-row: 2; }
+        #btnRight { grid-column: 3; grid-row: 2; }
+        #btnDown { grid-column: 2; grid-row: 3; }
+        
+        #actionControls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px; /* 왼쪽 하단으로 이동 */
+            display: flex;
+            flex-direction: column; /* 수직 정렬 */
+            gap: 15px;
+            z-index: 50;
+        }
+        .action-button {
+            background-color: rgba(255, 100, 100, 0.5); /* 가속/감속 버튼 색상 */
+            border: 2px solid rgba(255, 100, 100, 0.7);
+            border-radius: 10px; /* 사각형 버튼 */
+            color: white;
+            font-size: 16px;
+            padding: 15px 10px;
+            width: 70px; /* 버튼 너비 */
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+             -webkit-tap-highlight-color: transparent;
+        }
+         .action-button:active {
+            background-color: rgba(255, 100, 100, 0.8);
+        }
+        #btnBoost { background-color: rgba(100, 255, 100, 0.5); border-color: rgba(100, 255, 100, 0.7); }
+        #btnBoost:active { background-color: rgba(100, 255, 100, 0.8); }
+
+
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="scoreBoard" class="ui-element">점수: 0</div>
+        <div id="livesBoard" class="ui-element">생명: 3</div>
+        <div id="timerDisplay" class="ui-element">시간: 00:00</div>
+        <div id="debugInfo" class="ui-element">장애물: 1</div>
+        <div id="controlsMessage" class="ui-element">
+            조작: ← → (좌우) / ↑ ↓ (상하) / W (가속) / S (감속)
+        </div>
+        <div id="audioStartMessage">클릭하여 시작</div>
+        <div id="gameOverScreen">
+            <h2>게임 종료</h2>
+            <p id="finalScore">최종 점수: 0</p>
+            <p id="finalTimeDisplay">생존 시간: 00:00</p>
+            <button id="restartButton">다시 시작</button>
+        </div>
+
+        <div id="mobileControls">
+            <div id="btnUp" class="control-button">▲</div>
+            <div id="btnLeft" class="control-button">◀</div>
+            <div id="btnRight" class="control-button">▶</div>
+            <div id="btnDown" class="control-button">▼</div>
+        </div>
+        <div id="actionControls">
+            <div id="btnBoost" class="action-button">가속</div>
+            <div id="btnSlow" class="action-button">감속</div>
+        </div>
+    </div>
+
+    <script>
+        // --- 기본 설정 ---
+        let scene, camera, renderer, clock, player, gameConfig, audioInitialized = false;
+        let score = 0, lives = 3, elapsedTime = 0;
+        let gameRunning = true;
+        let collectibles = [], obstacles = [];
+        const keys = {}; // 키보드 및 터치 버튼 상태 공유
+
+        // --- 피보나치 관련 변수 ---
+        let fibA = 0, fibB = 1;
+        let currentFibObstacleCount = 1;
+        const fibUpdateInterval = 3000; 
+        let lastFibUpdateTime = 0;
+        const maxFibObstacles = 8; 
+
+        // --- 카메라 애니메이션 관련 변수 ---
+        const defaultFOV = 75;
+        const boostFOV = 88; 
+        const defaultCameraZOffset = 12;
+        const boostCameraZOffset = 15; 
+
+
+        // --- 사운드 객체 (Tone.js) ---
+        let mainSynth, collectSound, crashSound, boostSynth;
+        const newMusicPattern = [
+            { time: "0:0:0", note: "C5", duration: "8n" }, { time: "0:0:2", note: "E5", duration: "8n" },
+            { time: "0:1:0", note: "G5", duration: "8n" }, { time: "0:1:2", note: "C6", duration: "8n" },
+            { time: "0:2:0", note: "E5", duration: "8n" }, { time: "0:2:2", note: "G5", duration: "8n" },
+            { time: "0:3:0", note: "B5", duration: "8n" }, { time: "0:3:2", note: "G5", duration: "8n" },
+            { time: "1:0:0", note: "A5", duration: "8n" }, { time: "1:0:2", note: "F5", duration: "8n" },
+            { time: "1:1:0", note: "D5", duration: "8n" }, { time: "1:1:2", note: "A5", duration: "8n" },
+            { time: "1:2:0", note: "G5", duration: "4n" }, { time: "1:3:0", note: "E5", duration: "4n" },
+            { time: "2:0:0", note: "F5", duration: "8n" }, { time: "2:0:2", note: "A5", duration: "8n" },
+            { time: "2:1:0", note: "C6", duration: "8n" }, { time: "2:1:2", note: "F6", duration: "8n" },
+            { time: "2:2:0", note: "E6", duration: "8n" }, { time: "2:2:2", note: "C6", duration: "8n" },
+            { time: "2:3:0", note: "A5", duration: "8n" }, { time: "2:3:2", note: "G5", duration: "8n" },
+            { time: "3:0:0", note: "D5", duration: "8n" }, { time: "3:0:2", note: "G5", duration: "8n" },
+            { time: "3:1:0", note: "B5", duration: "8n" }, { time: "3:1:2", note: "D6", duration: "8n" },
+            { time: "3:2:0", note: "C6", duration: "2n" },
+        ];
+
+
+        // --- HTML 요소 ---
+        const scoreBoard = document.getElementById('scoreBoard');
+        const livesBoard = document.getElementById('livesBoard');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const debugInfo = document.getElementById('debugInfo'); 
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const finalTimeDisplay = document.getElementById('finalTimeDisplay');
+        const restartButton = document.getElementById('restartButton');
+        const gameCanvas = document.getElementById('gameCanvas');
+        const gameContainer = document.getElementById('gameContainer');
+        const audioStartMessage = document.getElementById('audioStartMessage');
+
+        // 모바일 컨트롤 버튼 요소
+        const btnUp = document.getElementById('btnUp');
+        const btnDown = document.getElementById('btnDown');
+        const btnLeft = document.getElementById('btnLeft');
+        const btnRight = document.getElementById('btnRight');
+        const btnBoost = document.getElementById('btnBoost');
+        const btnSlow = document.getElementById('btnSlow');
+
+
+        // --- 게임 설정 객체 (속도 및 빈도 향상) ---
+        gameConfig = {
+            playerManeuverSpeed: 0.48, 
+            objectBaseSpeed: 0.22,    
+            objectBoostMultiplier: 3.0, 
+            objectSlowMultiplier: 0.45,  
+            rotationSpeed: 0.05,
+            boundaryX: 25, 
+            boundaryY: 15, 
+            collectibleValue: 10,
+            obstacleDamage: 1,
+            spawnInterval: { collectible: 1100, obstacle: 1800 }, 
+            lastSpawnTime: { collectible: 0, obstacle: 0 },
+            worldDepth: 150 
+        };
+
+        // --- 오디오 초기화 ---
+        async function initializeAudio() {
+            if (audioInitialized) return;
+            // 오디오 컨텍스트는 사용자 상호작용(클릭 등)에 의해 시작되어야 합니다.
+            // audioStartMessage 클릭 시 이 함수가 호출됩니다.
+            await Tone.start(); 
+            
+            mainSynth = new Tone.PolySynth(Tone.FMSynth, {
+                harmonicity: 1.5, modulationIndex: 5, detune: 0,
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3 },
+                modulation: { type: "square" },
+                modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.1 },
+                volume: -15 
+            }).toDestination();
+            
+            collectSound = new Tone.Synth({
+                oscillator: { type: "triangle" }, 
+                envelope: { attack: 0.005, decay: 0.08, sustain: 0.01, release: 0.1 }
+            }).toDestination();
+            collectSound.volume.value = -5;
+            
+            crashSound = new Tone.NoiseSynth({
+                noise: { type: "brown" }, 
+                envelope: { attack: 0.01, decay: 0.25, sustain: 0, release: 0.1 }
+            }).toDestination();
+            crashSound.volume.value = -7;
+
+            boostSynth = new Tone.MonoSynth({ 
+                oscillator : { type : "sawtooth6" }, 
+                envelope : { attack : 0.01, decay : 0.03, sustain : 0.01, release : 0.05},
+                filterEnvelope : {attack : 0.005, decay : 0.01, sustain : 0, release : 0.05, baseFrequency : 400, octaves : 2.5},
+                volume: -16
+            }).toDestination();
+
+            const part = new Tone.Part((time, value) => {
+                mainSynth.triggerAttackRelease(value.note, value.duration, time);
+            }, newMusicPattern).start(0);
+            part.loop = true;
+            part.loopEnd = "4m"; 
+
+            Tone.Transport.bpm.value = 150; 
+            Tone.Transport.start();
+            
+            audioInitialized = true;
+            audioStartMessage.style.display = 'none'; // 메시지 숨김
+            console.log("Audio initialized and new background music started.");
+        }
+        
+        // "클릭하여 시작" 메시지에 이벤트 리스너 추가
+        audioStartMessage.addEventListener('click', initializeAudio, { once: true });
+
+
+        // --- 초기화 ---
+        function init() {
+            score = 0; lives = 3; gameRunning = true; elapsedTime = 0;
+            collectibles.forEach(c => scene.remove(c)); obstacles.forEach(o => scene.remove(o));
+            collectibles = []; obstacles = [];
+            gameConfig.lastSpawnTime.collectible = 0; gameConfig.lastSpawnTime.obstacle = 0;
+            
+            fibA = 0; fibB = 1; currentFibObstacleCount = 1; lastFibUpdateTime = 0;
+            debugInfo.textContent = `장애물: ${currentFibObstacleCount}`;
+
+
+            scoreBoard.textContent = `점수: ${score}`;
+            livesBoard.textContent = `생명: ${lives}`;
+            timerDisplay.textContent = `시간: 00:00`;
+            gameOverScreen.style.display = 'none';
+            // 오디오가 초기화되지 않았고, 게임오버가 아니라면 시작 메시지 표시
+            if (!audioInitialized && gameOverScreen.style.display === 'none') {
+                audioStartMessage.style.display = 'flex';
+            } else if (audioInitialized && Tone.Transport.state !== "started") { 
+                // 오디오는 초기화되었지만 BGM이 멈춘 경우 (재시작 시)
+                Tone.Transport.start();
+            }
+
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEFA); 
+            scene.fog = new THREE.Fog(0xADD8E6, 60, 220); 
+
+            camera = new THREE.PerspectiveCamera(defaultFOV, gameContainer.clientWidth / gameContainer.clientHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true });
+            renderer.setSize(gameContainer.clientWidth, gameContainer.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            clock = new THREE.Clock(); 
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.75); 
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.85); 
+            directionalLight.position.set(50, 60, 40);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            createPlayer(); 
+            if (player) {
+                 camera.position.set(player.position.x, player.position.y + 5, player.position.z + defaultCameraZOffset);
+                 camera.lookAt(player.position);
+            }
+
+            createClouds();
+
+            // 키보드 이벤트 리스너
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+
+            // 모바일 터치 버튼 이벤트 리스너
+            setupMobileControls();
+
+
+            window.addEventListener('resize', onWindowResize);
+            restartButton.addEventListener('click', init); 
+            onWindowResize(); 
+
+            if(player) {
+                lastFibUpdateTime = 0; 
+                animate();
+            } else {
+                console.error("Player not created!");
+            }
+        }
+
+        function handleKeyDown(e) {
+            const key = e.key.toLowerCase();
+            // 'w' 키 처음 눌렸을 때 부스트 사운드 재생 (오디오 초기화 및 boostSynth 존재 확인)
+            if (key === 'w' && !keys[key] && audioInitialized && boostSynth) { 
+                boostSynth.triggerAttack("G3"); 
+            }
+            keys[key] = true;
+        }
+
+        function handleKeyUp(e) {
+            const key = e.key.toLowerCase();
+            // 'w' 키 뗄 때 부스트 사운드 중지
+            if (key === 'w' && audioInitialized && boostSynth) {
+                boostSynth.triggerRelease(); 
+            }
+            keys[key] = false;
+        }
+
+        function setupMobileControls() {
+            const controlMap = {
+                'btnUp': 'arrowup', 'btnDown': 'arrowdown', 'btnLeft': 'arrowleft', 'btnRight': 'arrowright',
+                'btnBoost': 'w', 'btnSlow': 's'
+            };
+
+            Object.keys(controlMap).forEach(buttonId => {
+                const buttonElement = document.getElementById(buttonId);
+                if (!buttonElement) {
+                    console.error(`Mobile control button with ID '${buttonId}' not found.`);
+                    return; 
+                }
+                const keyToSimulate = controlMap[buttonId];
+
+                buttonElement.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); 
+                    // 'w' 버튼 터치 시작 시 부스트 사운드 재생
+                    if (keyToSimulate === 'w' && !keys[keyToSimulate] && audioInitialized && boostSynth) {
+                        boostSynth.triggerAttack("G3");
+                    }
+                    keys[keyToSimulate] = true;
+                    // 버튼 활성 상태 스타일 변경
+                    buttonElement.style.backgroundColor = buttonId === 'btnBoost' ? 'rgba(100, 255, 100, 0.8)' : (buttonId === 'btnSlow' ? 'rgba(255, 100, 100, 0.8)' : 'rgba(255, 255, 255, 0.6)');
+                }, { passive: false }); 
+
+                buttonElement.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    // 'w' 버튼 터치 종료 시 부스트 사운드 중지
+                    if (keyToSimulate === 'w' && audioInitialized && boostSynth) {
+                        boostSynth.triggerRelease();
+                    }
+                    keys[keyToSimulate] = false;
+                    // 버튼 비활성 상태 스타일 복원
+                    buttonElement.style.backgroundColor = buttonId === 'btnBoost' ? 'rgba(100, 255, 100, 0.5)' : (buttonId === 'btnSlow' ? 'rgba(255, 100, 100, 0.5)' : 'rgba(255, 255, 255, 0.3)');
+                }, { passive: false });
+            });
+        }
+
+
+        // --- 플레이어 생성 (꼬마 장난감 비행기 디자인 - Z축 기준) ---
+        function createPlayer() {
+            player = new THREE.Group(); 
+
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFF4500, roughness: 0.5, metalness: 0.4 }); 
+            const wingMaterial = new THREE.MeshStandardMaterial({ color: 0x6495ED, roughness: 0.6, metalness: 0.3 }); 
+            const propellerMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700, roughness: 0.4, metalness: 0.2 }); 
+            const cockpitMaterial = new THREE.MeshStandardMaterial({color: 0xAFEEEE, transparent: true, opacity: 0.6}); 
+
+            const fuselageLength = 2.8;
+            const fuselageRadiusTop = 0.5;
+            const fuselageRadiusBottom = 0.35;
+            const fuselageGeometry = new THREE.CylinderGeometry(fuselageRadiusTop, fuselageRadiusBottom, fuselageLength, 12);
+            const fuselage = new THREE.Mesh(fuselageGeometry, bodyMaterial);
+            fuselage.rotation.x = Math.PI / 2; 
+            fuselage.castShadow = true;
+            player.add(fuselage);
+
+            const noseRadius = fuselageRadiusTop;
+            const noseGeometry = new THREE.SphereGeometry(noseRadius, 12, 8, 0, Math.PI * 2, 0, Math.PI/2);
+            const nose = new THREE.Mesh(noseGeometry, bodyMaterial);
+            nose.rotation.x = Math.PI / 2;
+            nose.position.z = -fuselageLength / 2; 
+            player.add(nose);
+
+            const cockpitGeometry = new THREE.SphereGeometry(0.4, 12, 8, 0, Math.PI*2, 0, Math.PI/2);
+            const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
+            cockpit.position.y = fuselageRadiusTop * 0.7;
+            cockpit.position.z = -0.3; 
+            player.add(cockpit);
+
+            const mainWingWidth = 4.8;
+            const mainWingDepth = 1.0; 
+            const mainWingThickness = 0.2;
+            const mainWingGeometry = new THREE.BoxGeometry(mainWingWidth, mainWingThickness, mainWingDepth); 
+            const mainWing = new THREE.Mesh(mainWingGeometry, wingMaterial);
+            mainWing.position.y = 0.05; 
+            mainWing.position.z = -0.2; 
+            mainWing.rotation.z = 0.03; 
+            mainWing.castShadow = true;
+            player.add(mainWing);
+
+            const tailPlaneWidth = 2.2;
+            const tailPlaneDepth = 0.6;
+            const tailPlaneGeometry = new THREE.BoxGeometry(tailPlaneWidth, mainWingThickness * 0.8, tailPlaneDepth);
+            const tailPlane = new THREE.Mesh(tailPlaneGeometry, wingMaterial);
+            tailPlane.position.set(0, fuselageRadiusBottom * 0.8, fuselageLength / 2 - tailPlaneDepth/2); 
+            player.add(tailPlane);
+
+            const tailFinHeight = 0.9;
+            const tailFinDepth = 0.5;
+            const tailFinGeometry = new THREE.BoxGeometry(mainWingThickness*0.7, tailFinHeight, tailFinDepth); 
+            const tailFin = new THREE.Mesh(tailFinGeometry, wingMaterial);
+            tailFin.position.set(0, fuselageRadiusBottom + tailFinHeight/2 -0.1, fuselageLength / 2 - tailFinDepth*0.8); 
+            player.add(tailFin);
+
+            const propellerGroup = new THREE.Group();
+            const bladeLength = 1.1;
+            const bladeWidth = 0.15;
+            const bladeGeometry = new THREE.BoxGeometry(bladeWidth, bladeLength, bladeWidth/2);
+            const blade1 = new THREE.Mesh(bladeGeometry, propellerMaterial);
+            propellerGroup.add(blade1);
+            const blade2 = blade1.clone();
+            blade2.rotation.z = Math.PI / 2; 
+            propellerGroup.add(blade2);
+            propellerGroup.position.z = -fuselageLength / 2 - noseRadius * 0.8; 
+            player.add(propellerGroup);
+            player.userData.propeller = propellerGroup; 
+
+            player.position.set(0, 0, 0); 
+            player.scale.set(0.9, 0.9, 0.9); 
+            scene.add(player);
+        }
+
+
+        // --- 구름 배경 생성 ---
+        function createClouds() {
+            const cloudMaterial = new THREE.MeshPhongMaterial({
+                color: 0xffffff, transparent: true, opacity: 0.65, 
+                emissive: 0xf0f0f0, depthWrite: false 
+            });
+            for (let i = 0; i < 60; i++) { 
+                const cloudGroup = new THREE.Group();
+                const numSpheres = Math.floor(Math.random() * 6) + 4; 
+                for (let j = 0; j < numSpheres; j++) {
+                    const size = Math.random() * 6 + 3; 
+                    const sphereGeo = new THREE.SphereGeometry(size, 8, 6); 
+                    const sphere = new THREE.Mesh(sphereGeo, cloudMaterial);
+                    sphere.position.set((Math.random()-0.5)*12, (Math.random()-0.5)*4, (Math.random()-0.5)*6);
+                    cloudGroup.add(sphere);
+                }
+                cloudGroup.position.set(
+                    (Math.random()-0.5)*180, 
+                    (Math.random()-0.5)*60-15, 
+                    (Math.random()-0.5)*gameConfig.worldDepth-60
+                );
+                cloudGroup.userData.isCloud = true; 
+                scene.add(cloudGroup);
+            }
+        }
+        
+        // --- 수집 아이템 생성 (슈퍼마리오 금화 스타일) ---
+        function spawnCollectible() {
+            const coinRadius = 0.7; 
+            const coinThickness = 0.2; 
+            const geometry = new THREE.CylinderGeometry(coinRadius, coinRadius, coinThickness, 20); 
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0xFFDF00, 
+                metalness: 0.85, 
+                roughness: 0.3,  
+                emissive: 0xB8860B, 
+            });
+            const collectible = new THREE.Mesh(geometry, material);
+            collectible.userData.isCoin = true; 
+            collectible.position.set(
+                (Math.random()-0.5)*gameConfig.boundaryX*1.8, 
+                (Math.random()-0.5)*gameConfig.boundaryY*1.8,
+                -gameConfig.worldDepth / 2 - Math.random() * 20 
+            );
+            collectible.castShadow = true;
+            collectibles.push(collectible);
+            scene.add(collectible);
+        }
+
+        // --- 장애물 생성 (바위 모양) ---
+        function spawnObstacle() {
+            for (let i = 0; i < currentFibObstacleCount; i++) {
+                const rockSize = Math.random() * 2.0 + 1.5; 
+                const geometry = new THREE.IcosahedronGeometry(rockSize, Math.floor(Math.random() * 2)); 
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: Math.random() > 0.5 ? 0x778899 : 0x8B4513, 
+                    roughness: 0.85, 
+                    metalness: 0.05 
+                });
+                const obstacle = new THREE.Mesh(geometry, material);
+                
+                const positionAttribute = obstacle.geometry.attributes.position;
+                for (let j = 0; j < positionAttribute.count; j++) {
+                    const x = positionAttribute.getX(j);
+                    const y = positionAttribute.getY(j);
+                    const z = positionAttribute.getZ(j);
+                    const noiseFactor = 0.35; 
+                    positionAttribute.setXYZ(
+                        j,
+                        x + (Math.random() - 0.5) * noiseFactor * rockSize,
+                        y + (Math.random() - 0.5) * noiseFactor * rockSize,
+                        z + (Math.random() - 0.5) * noiseFactor * rockSize
+                    );
+                }
+                obstacle.geometry.computeVertexNormals(); 
+
+                const offsetX = (Math.random() - 0.5) * currentFibObstacleCount * 2.5; 
+                const offsetY = (Math.random() - 0.5) * currentFibObstacleCount * 1.5; 
+
+                obstacle.position.set(
+                    ((Math.random()-0.5)*gameConfig.boundaryX*1.5) + offsetX, 
+                    ((Math.random()-0.5)*gameConfig.boundaryY*1.5) + offsetY,
+                    -gameConfig.worldDepth/2 - Math.random() * 30 
+                );
+                obstacle.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI); 
+                obstacle.castShadow = true;
+                obstacles.push(obstacle);
+                scene.add(obstacle);
+            }
+        }
+        
+        function onWindowResize() {
+            const newWidth = gameContainer.clientWidth;
+            const newHeight = gameContainer.clientHeight;
+            camera.aspect = newWidth / newHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(newWidth, newHeight);
+        }
+
+        // --- 게임 로직 업데이트 ---
+        function updateGame(deltaTime) {
+            if (!gameRunning || !player) return;
+
+            elapsedTime += deltaTime; 
+            const minutes = Math.floor(elapsedTime / 60);
+            const seconds = Math.floor(elapsedTime % 60);
+            timerDisplay.textContent = `시간: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+
+            const playerMoveSpeed = gameConfig.playerManeuverSpeed * (deltaTime * 60); 
+
+            if (keys['arrowleft'] || keys['a']) player.position.x -= playerMoveSpeed;
+            if (keys['arrowright'] || keys['d']) player.position.x += playerMoveSpeed;
+            if (keys['arrowup']) player.position.y += playerMoveSpeed; 
+            if (keys['arrowdown']) player.position.y -= playerMoveSpeed;
+
+            player.position.x = Math.max(-gameConfig.boundaryX, Math.min(gameConfig.boundaryX, player.position.x));
+            player.position.y = Math.max(-gameConfig.boundaryY, Math.min(gameConfig.boundaryY, player.position.y));
+            
+            if (player.userData.propeller) {
+                player.userData.propeller.rotation.z += 0.9 * (deltaTime*60) * (keys['w'] ? 3.0 : 1); 
+            }
+
+            const targetFOV = keys['w'] ? boostFOV : defaultFOV;
+            const targetCameraZ = player.position.z + (keys['w'] ? boostCameraZOffset : defaultCameraZOffset);
+            camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 0.12 * (deltaTime * 60)); 
+            camera.updateProjectionMatrix();
+            
+            const cameraTargetPosition = new THREE.Vector3(player.position.x, player.position.y + 3, targetCameraZ); 
+            camera.position.lerp(cameraTargetPosition, 0.06 * (deltaTime * 60)); 
+            camera.lookAt(player.position.x, player.position.y, player.position.z); 
+
+
+            const currentTimeInMs = elapsedTime * 1000; 
+            
+            if (currentTimeInMs - lastFibUpdateTime > fibUpdateInterval) {
+                const nextFib = fibA + fibB;
+                fibA = fibB;
+                fibB = nextFib;
+                currentFibObstacleCount = Math.min(Math.max(1, nextFib), maxFibObstacles); 
+                lastFibUpdateTime = currentTimeInMs;
+                debugInfo.textContent = `장애물: ${currentFibObstacleCount}`;
+            }
+
+            if (currentTimeInMs - gameConfig.lastSpawnTime.collectible > gameConfig.spawnInterval.collectible) {
+                spawnCollectible(); gameConfig.lastSpawnTime.collectible = currentTimeInMs;
+            }
+            if (currentTimeInMs - gameConfig.lastSpawnTime.obstacle > gameConfig.spawnInterval.obstacle) {
+                spawnObstacle(); gameConfig.lastSpawnTime.obstacle = currentTimeInMs;
+            }
+
+            let currentObjectApproachSpeed = gameConfig.objectBaseSpeed;
+            if (keys['w']) {
+                currentObjectApproachSpeed *= gameConfig.objectBoostMultiplier;
+                if (audioInitialized && boostSynth && boostSynth.envelope.value !== 1) { 
+                     boostSynth.frequency.rampTo("A3", 0.05); 
+                }
+            } else {
+                 if (audioInitialized && boostSynth && boostSynth.envelope.value === 1) { 
+                    boostSynth.frequency.rampTo("G3", 0.1); 
+                 }
+            }
+
+            if (keys['s']) {
+                currentObjectApproachSpeed *= gameConfig.objectSlowMultiplier;
+            }
+            const objectMoveDistance = currentObjectApproachSpeed * (deltaTime * 60); 
+
+            [...collectibles, ...obstacles].forEach((obj) => {
+                obj.position.z += objectMoveDistance; 
+
+                if (obj.userData.isCoin) {
+                    obj.rotation.y += 0.05 * (deltaTime * 60); 
+                    obj.rotation.x += 0.02 * (deltaTime * 60); 
+                }
+
+
+                const distance = player.position.distanceTo(obj.position);
+                const playerRadius = 1.2; 
+                let objRadius;
+                if (obj.geometry.type === 'CylinderGeometry') { 
+                    objRadius = obj.geometry.parameters.radiusTop;
+                } else if (obj.geometry.type === 'IcosahedronGeometry') { 
+                    objRadius = obj.geometry.parameters.radius * 0.8; 
+                } else { 
+                    objRadius = 0.5; 
+                }
+
+
+                if (distance < playerRadius + objRadius) {
+                    if (collectibles.includes(obj)) { 
+                        score += gameConfig.collectibleValue;
+                        scoreBoard.textContent = `점수: ${score}`;
+                        if(audioInitialized && collectSound) collectSound.triggerAttackRelease("A5", "20n", Tone.now() + 0.01); 
+                        scene.remove(obj); collectibles.splice(collectibles.indexOf(obj), 1);
+                    } else { 
+                        lives -= gameConfig.obstacleDamage;
+                        livesBoard.textContent = `생명: ${lives}`;
+                        if(audioInitialized && crashSound) crashSound.triggerAttackRelease("0.12n", Tone.now() + 0.01); 
+                        scene.remove(obj); obstacles.splice(obstacles.indexOf(obj), 1);
+                        if (lives <= 0) gameOver();
+                        
+                        gameContainer.style.animation = 'shake 0.25s'; 
+                        setTimeout(() => gameContainer.style.animation = '', 250);
+                    }
+                }
+                else if (obj.position.z > camera.position.z + 15) { 
+                    scene.remove(obj);
+                    if (collectibles.includes(obj)) collectibles.splice(collectibles.indexOf(obj), 1);
+                    if (obstacles.includes(obj)) obstacles.splice(obstacles.indexOf(obj), 1);
+                }
+            });
+            
+            scene.children.forEach(child => {
+                if (child.userData.isCloud) {
+                    child.position.z += gameConfig.objectBaseSpeed * 0.12 * (deltaTime * 60); 
+                    if (child.position.z > camera.position.z + 25) {
+                        child.position.z = -gameConfig.worldDepth / 2 - Math.random() * 60; 
+                        child.position.x = (Math.random() - 0.5) * 180;
+                    }
+                }
+            });
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            finalScoreDisplay.textContent = `최종 점수: ${score}`;
+            const minutes = Math.floor(elapsedTime / 60);
+            const seconds = Math.floor(elapsedTime % 60);
+            finalTimeDisplay.textContent = `생존 시간: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            gameOverScreen.style.display = 'flex';
+            if (audioInitialized && Tone.Transport.state === "started") {
+                Tone.Transport.stop(); 
+            }
+        }
+
+        function animate() {
+            if (!gameRunning && gameOverScreen.style.display === 'none') {} 
+            else if (gameRunning) { requestAnimationFrame(animate); }
+
+            const deltaTime = clock.getDelta();
+            updateGame(deltaTime);
+            renderer.render(scene, camera);
+        }
+        
+        const styleSheet = document.createElement("style");
+        styleSheet.type = "text/css";
+        styleSheet.innerText = `@keyframes shake {0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}} @keyframes pulseTimer{0%{transform:translateX(-50%) scale(1);opacity:.9}50%{transform:translateX(-50%) scale(1.05);opacity:1;color:#FFFACD}100%{transform:translateX(-50%) scale(1);opacity:.9}}`;
+        document.head.appendChild(styleSheet);
+
+        init(); // 게임 시작
+    </script>
+</body>
+</html>
