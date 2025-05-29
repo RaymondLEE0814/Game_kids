@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>토끼의 당근밭 모험</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB; /* 밝은 하늘색 배경 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Arial', sans-serif;
+            -webkit-user-select: none; /* 드래그 방지 */
+            user-select: none;
+        }
+        #gameContainer {
+            width: 100vw; 
+            height: 100vh; 
+            position: relative;
+            background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 70%, #98FB98 100%); /* 하늘에서 초원으로 이어지는 그라데이션 */
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .ui-element {
+            position: absolute;
+            color: #333; 
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8); 
+            padding: 8px 12px;
+            background-color: rgba(255, 255, 255, 0.6); 
+            border-radius: 8px;
+            border: 1px solid rgba(100, 100, 100, 0.3);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+            z-index: 10; /* 다른 요소들 위에 표시 */
+        }
+        #distanceDisplay { 
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 40px; 
+            color: #FFD700; 
+            font-weight: bold;
+            background-color: transparent;
+            border: none;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.6); 
+            padding: 10px;
+        }
+        #livesDisplay { 
+            top: 20px; 
+            left: 20px; 
+            font-size: 24px;
+            font-weight: bold;
+        }
+         #scoreDisplay { 
+            top: 60px; 
+            left: 20px; 
+            font-size: 18px;
+        }
+
+        #gameOverScreen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); 
+            color: white;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; z-index: 100;
+        }
+        #gameOverScreen h2 { font-size: 52px; margin-bottom: 20px; color: #FF6347; text-shadow: 0 0 10px #FF0000;} 
+        #gameOverScreen p { font-size: 26px; margin-bottom: 18px; }
+        #finalDistanceDisplay { font-size: 22px; margin-bottom: 30px; color: #FFD700; }
+        #restartButton {
+            padding: 18px 35px; font-size: 22px; background-color: #90EE90; 
+            color: #2E8B57; border: none; border-radius: 12px; cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s; box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+            font-weight: bold;
+        }
+        #restartButton:hover { background-color: #3CB371; color:white; } 
+        #restartButton:active { transform: scale(0.96); }
+
+        #mobileControlContainer {
+            position: absolute;
+            bottom: 25px; 
+            left: 0;
+            right: 0;
+            height: 100px; 
+            display: flex;
+            justify-content: space-between; 
+            align-items: flex-end; 
+            padding: 0 20px; 
+            box-sizing: border-box;
+            z-index: 50;
+        }
+        #jumpButtonContainer { 
+            display: flex;
+            justify-content: flex-start;
+            flex-grow: 1;
+        }
+        #arrowButtonContainer { 
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px; 
+            flex-grow: 1;
+        }
+        .mobile-button {
+            background-color: rgba(255, 165, 0, 0.7); 
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%; 
+            width: 75px; 
+            height: 75px; 
+            color: white;
+            font-size: 28px; 
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.15s, transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 7px rgba(0,0,0,0.25);
+        }
+        .mobile-button:active {
+            background-color: rgba(255, 140, 0, 0.9);
+            transform: scale(0.95);
+        }
+        #btnJump { 
+            background-color: rgba(138, 43, 226, 0.7); 
+            border-color: rgba(255, 255, 255, 0.9);
+            width: 85px; 
+            height: 85px;
+        }
+        #btnJump:active {
+             background-color: rgba(120, 30, 200, 0.9);
+        }
+
+         #audioStartMessage {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 28px; color: #556B2F; text-shadow: 1px 1px 2px white;
+            padding: 25px; background-color: rgba(240, 255, 240, 0.9); border-radius: 10px;
+            z-index: 101; cursor: pointer; border: 2px solid #8FBC8F; box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        }
+        /* 화면 흔들림 애니메이션 */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-0.5deg); }
+            20% { transform: translate(-3px, 0px) rotate(0.5deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(0.5deg); }
+            50% { transform: translate(-1px, 2px) rotate(-0.5deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-0.5deg); }
+            80% { transform: translate(-1px, -1px) rotate(0.5deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-0.5deg); }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="scoreDisplay" class="ui-element">당근: 0</div>
+        <div id="distanceDisplay" class="ui-element">0m</div> 
+        <div id="livesDisplay" class="ui-element">생명: ❤️❤️❤️</div>
+        <div id="audioStartMessage">클릭하여 시작!</div>
+        <div id="gameOverScreen">
+            <h2>게임 오버!</h2>
+            <p id="finalScoreDisplay">최종 당근: 0</p>
+            <p id="finalDistanceDisplay">최종 거리: 0m</p>
+            <button id="restartButton">다시 도전!</button>
+        </div>
+        
+        <div id="mobileControlContainer">
+            <div id="jumpButtonContainer">
+                <div id="btnJump" class="mobile-button">점프</div>
+            </div>
+            <div id="arrowButtonContainer">
+                <div id="btnLeft" class="mobile-button">◀</div>
+                <div id="btnRight" class="mobile-button">▶</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 전역 변수 ---
+        var scene, camera, renderer, clock, rabbit, gameConfig, audioInitialized = false;
+        var score = 0, lives = 3, distanceTraveled = 0, elapsedTime = 0;
+        var gameRunning = true;
+        const keys = {}; 
+        var pathSegments = [];
+        var obstacles = [], collectibles = [];
+        var carrotForNextHeart = 0; 
+        var distantSceneryElements = []; // 배경 요소 관리 배열
+
+        var rabbitYSpeed = 0;
+        const gravity = 30; 
+        const jumpPower = 11; 
+        var isJumping = false;
+        const groundY = 0.75; 
+        const MAX_LIVES = 3;
+
+        var fibA = 0, fibB = 1;
+        var speedIncreaseInterval = 5000; 
+        var lastSpeedIncreaseTime = 0;
+        var currentSpeedMultiplier = 1.0;
+
+
+        var bgMusic, collectCarrotSound, crashRockSound, jumpSound, sideJumpSound;
+        var mainSynth; 
+
+        const newMusicPattern = [ 
+            { time: "0:0", note: "C5", duration: "8n" }, { time: "0:0:2", note: "D5", duration: "8n" },
+            { time: "0:1", note: "E5", duration: "8n" }, { time: "0:1:2", note: "G5", duration: "8n" },
+            { time: "0:2", note: "A5", duration: "4n" }, { time: "0:3", note: "G5", duration: "4n" },
+            { time: "1:0", note: "F5", duration: "8n" }, { time: "1:0:2", note: "A5", duration: "8n" },
+            { time: "1:1", note: "C6", duration: "8n" }, { time: "1:1:2", note: "A5", duration: "8n" },
+            { time: "1:2", note: "G5", duration: "2n" },
+            { time: "2:0", note: "E5", duration: "8n" }, { time: "2:0:2", note: "G5", duration: "8n" },
+            { time: "2:1", note: "B5", duration: "8n" }, { time: "2:1:2", note: "D6", duration: "8n" },
+            { time: "2:2", note: "C6", duration: "4n" }, { time: "2:3", note: "B5", duration: "4n" },
+            { time: "3:0", note: "A5", duration: "8n" }, { time: "3:0:2", note: "G5", duration: "8n" },
+            { time: "3:1", note: "F5", duration: "8n" }, { time: "3:1:2", note: "E5", duration: "8n" },
+            { time: "3:2", note: "D5", duration: "2n" },
+        ];
+
+        var scoreDisplay = document.getElementById('scoreDisplay'); 
+        var livesDisplay = document.getElementById('livesDisplay'); 
+        var distanceDisplay = document.getElementById('distanceDisplay'); 
+        var gameOverScreen = document.getElementById('gameOverScreen'); 
+        var finalScoreDisplay = document.getElementById('finalScoreDisplay'); 
+        var finalDistanceDisplay = document.getElementById('finalDistanceDisplay'); 
+        var restartButton = document.getElementById('restartButton'); 
+        var audioStartMessage = document.getElementById('audioStartMessage'); 
+
+        gameConfig = {
+            rabbitLane: 0, 
+            laneWidth: 3.0, 
+            baseForwardSpeed: 9, 
+            currentForwardSpeed: 9,
+            sideJumpSpeed: 18,   
+            pathSegmentLength: 4, 
+            pathSegmentsAhead: 25, 
+            pathSegmentsBehind: 6,
+            obstacleSpawnChance: 0.30, 
+            collectibleSpawnChance: 0.30, 
+            rabbitBoundingRadius: 0.4, 
+            obstacleBaseSize: 0.4, 
+            collectibleBoundingRadius: 0.3,
+            worldDepth: 0, 
+            scenerySpawnZDistance: 50, // 새로운 배경 요소가 생성될 Z 거리
+            sceneryRemoveZDistance: 20, // 오래된 배경 요소가 제거될 Z 거리 (카메라 뒤)
+        };
+
+        async function initializeAudio() {
+            if (audioInitialized) return;
+            try {
+                await Tone.start();
+
+                mainSynth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "fatsawtooth", detune: -1000, count: 2 }, 
+                    envelope: { attack: 0.01, decay: 0.15, sustain: 0.2, release: 0.25 },
+                    filter : { type : "lowpass", Q : 1.5, frequency: 1000 },
+                    filterEnvelope : { attack: 0.02, decay: 0.08, sustain: 0.4, release: 0.15, baseFrequency: 300, octaves: 2.5},
+                    volume: -24 
+                }).toDestination();
+            
+                const part = new Tone.Part((time, value) => {
+                    if(mainSynth) mainSynth.triggerAttackRelease(value.note, value.duration, time);
+                }, newMusicPattern).start(0);
+                part.loop = true;
+                part.loopEnd = "4m"; 
+                Tone.Transport.bpm.value = 155; 
+                Tone.Transport.start();
+
+                collectCarrotSound = new Tone.Synth({ 
+                    oscillator: {type: 'triangle'}, 
+                    envelope: {attack:0.001, decay:0.03, sustain:0.01, release:0.08}, 
+                    volume: -5
+                }).toDestination();
+
+                crashRockSound = new Tone.NoiseSynth({ 
+                    noise: { type: "pink", playbackRate: 0.4 },
+                    envelope: { attack: 0.008, decay: 0.18, sustain: 0, release: 0.1 },
+                    volume: -4
+                }).toDestination();
+
+                jumpSound = new Tone.Synth({
+                    oscillator: {type: 'sine'}, 
+                    envelope: {attack: 0.005, decay: 0.08, sustain: 0.01, release: 0.12},
+                    volume: -8
+                }).toDestination();
+                
+                sideJumpSound = new Tone.Synth({
+                    oscillator: {type: 'square3'},
+                    envelope: {attack: 0.005, decay: 0.04, sustain: 0.01, release: 0.07},
+                    volume: -14
+                }).toDestination();
+
+                audioInitialized = true;
+                audioStartMessage.style.display = 'none';
+            } catch (error) {
+                console.error("오디오 초기화 실패:", error);
+                audioStartMessage.textContent = "오디오 시작 실패";
+            }
+        }
+        audioStartMessage.addEventListener('click', initializeAudio, { once: true });
+
+        function init() {
+            gameConfig.worldDepth = gameConfig.pathSegmentsAhead * gameConfig.pathSegmentLength * 2.5; // worldDepth 초기화 위치 변경
+
+            score = 0; lives = MAX_LIVES; distanceTraveled = 0; gameRunning = true; elapsedTime = 0;
+            carrotForNextHeart = 0; 
+            gameConfig.rabbitLane = 0; 
+            gameConfig.currentForwardSpeed = gameConfig.baseForwardSpeed; 
+            fibA = 0; fibB = 1; 
+            lastSpeedIncreaseTime = 0; currentSpeedMultiplier = 1.0;
+            
+            if(scene){
+                while(scene.children.length > 0){ 
+                    const object = scene.children[0];
+                    scene.remove(object);
+                    if(object.geometry) object.geometry.dispose();
+                    if(object.material) {
+                        if (object.material.map) object.material.map.dispose();
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach(material => material.dispose());
+                        } else {
+                            object.material.dispose();
+                        }
+                    }
+                }
+            }
+            pathSegments = []; obstacles = []; collectibles = []; distantSceneryElements = []; 
+            rabbitYSpeed = 0; isJumping = false;
+
+            updateScoreDisplay();
+            updateLivesDisplay();
+            updateDistanceDisplay();
+            gameOverScreen.style.display = 'none';
+            if (!audioInitialized) audioStartMessage.style.display = 'flex';
+            else if (Tone.Transport.state !== "started") {
+                 Tone.Transport.start(); 
+            }
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xd1e0e0); 
+            scene.fog = new THREE.FogExp2( 0xd1e0e0, 0.012 ); 
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 250); 
+            
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            clock = new THREE.Clock(); 
+
+            const ambientLight = new THREE.AmbientLight(0xe0f0ff, 0.9); 
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); 
+            directionalLight.position.set(10, 15, 10); 
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            directionalLight.shadow.camera.near = 1;
+            directionalLight.shadow.camera.far = 60; 
+            directionalLight.shadow.camera.left = -30;
+            directionalLight.shadow.camera.right = 30;
+            directionalLight.shadow.camera.top = 30;
+            directionalLight.shadow.camera.bottom = -30;
+            scene.add(directionalLight);
+
+            createRabbit(); 
+            if(rabbit) {
+                scene.add(rabbit);
+                rabbit.position.set(0, groundY, 0); 
+                camera.position.set(0, 4, rabbit.position.z + 7); 
+                camera.lookAt(0, 1, rabbit.position.z); 
+            }
+
+            for (let i = -gameConfig.pathSegmentsBehind; i < gameConfig.pathSegmentsAhead; i++) {
+                addPathSegment(i * gameConfig.pathSegmentLength);
+            }
+            
+            // 초기 배경 생성
+            for(let i=0; i < 5; i++) { // 초기에는 몇 개만 미리 생성
+                createRandomSceneryElement(rabbit.position.z - i * (gameConfig.scenerySpawnZDistance/3) );
+            }
+
+
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            setupMobileControls();
+            window.addEventListener('resize', onWindowResize);
+            restartButton.addEventListener('click', init);
+            onWindowResize();
+
+            if(rabbit) animate();
+        }
+        
+        function createRandomSceneryElement(zPos) {
+            const sceneryType = Math.random() < 0.6 ? 'hill' : 'tree'; // 60% 확률로 언덕, 40% 확률로 나무
+            let element;
+            let xPositionOffset = gameConfig.laneWidth * 2.0 + Math.random() * 30 + 15; // 길 바깥쪽에 생성되도록 최소 거리 확보
+            let xPosition = (Math.random() < 0.5 ? -1 : 1) * xPositionOffset;
+
+
+            if (sceneryType === 'hill') {
+                const hillMaterial = new THREE.MeshLambertMaterial({ 
+                    color: 0x90EE90, 
+                    flatShading: true 
+                });
+                const height = Math.random() * 20 + 10; 
+                const radius = Math.random() * 15 + 8;  
+                const hillGeometry = new THREE.ConeGeometry(radius, height, Math.floor(Math.random()*2)+5); 
+                element = new THREE.Mesh(hillGeometry, hillMaterial);
+                element.position.set(xPosition, height / 2 - 10, zPos);
+                element.rotation.y = Math.random() * Math.PI * 2;
+            } else {
+                const treeTrunkMaterial = new THREE.MeshLambertMaterial({color: 0x8B4513}); 
+                const treeLeavesMaterial = new THREE.MeshLambertMaterial({color: 0x228B22}); 
+                const trunkHeight = Math.random() * 3 + 2;
+                const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, trunkHeight, 8);
+                element = new THREE.Mesh(trunkGeo, treeTrunkMaterial);
+                
+                const leavesHeight = Math.random() * 2 + 1.5;
+                const leavesGeo = new THREE.SphereGeometry(Math.random()*1 + 0.8, 8, 6);
+                const leaves = new THREE.Mesh(leavesGeo, treeLeavesMaterial);
+                leaves.position.y = trunkHeight / 2 + leavesHeight * 0.4;
+                element.add(leaves);
+                element.position.set(xPosition, trunkHeight / 2 - 0.2, zPos);
+            }
+            element.userData.isScenery = true; // 배경 요소 식별자
+            scene.add(element);
+            distantSceneryElements.push(element);
+        }
+
+        function manageDistantScenery() {
+            if (!rabbit) return;
+            // 새로운 배경 요소 생성
+            // 토끼가 특정 거리만큼 전진했을 때 새로운 배경 요소를 생성하도록 조건을 설정할 수 있습니다.
+            // 여기서는 마지막 배경 요소의 Z 위치를 기준으로 새로운 요소를 추가합니다.
+            let lastSceneryZ = distantSceneryElements.length > 0 ? 
+                                distantSceneryElements[distantSceneryElements.length-1].position.z : 
+                                rabbit.position.z - gameConfig.scenerySpawnZDistance;
+
+            if (rabbit.position.z < lastSceneryZ + gameConfig.scenerySpawnZDistance * 0.8) { // 마지막 배경 요소보다 충분히 앞에 갔을 때
+                 for(let i=0; i<2; i++){ // 한 번에 여러 개 생성 가능
+                    createRandomSceneryElement(rabbit.position.z - gameConfig.scenerySpawnZDistance - Math.random() * 20);
+                 }
+            }
+
+            // 오래된 배경 요소 제거
+            for (let i = distantSceneryElements.length - 1; i >= 0; i--) {
+                const element = distantSceneryElements[i];
+                if (element.position.z > camera.position.z + gameConfig.sceneryRemoveZDistance) { // 카메라 뒤로 충분히 멀어졌을 때
+                    scene.remove(element);
+                    if (element.geometry) element.geometry.dispose();
+                    if (element.material) {
+                        if (Array.isArray(element.material)) {
+                           element.material.forEach(m => m.dispose());
+                        } else {
+                           element.material.dispose();
+                        }
+                    }
+                    distantSceneryElements.splice(i, 1);
+                }
+            }
+        }
+
+
+        function createRabbit() {
+            rabbit = new THREE.Group();
+            // 토끼 모델 생성 코드는 이전과 동일하게 유지
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
+            const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            bodyGeometry.scale(1, 1.2, 0.9); 
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.5;
+            body.castShadow = true;
+            rabbit.add(body);
+
+            const headGeometry = new THREE.SphereGeometry(0.35, 16, 16);
+            const head = new THREE.Mesh(headGeometry, bodyMaterial);
+            head.position.set(0, 1.1, 0.1); 
+            rabbit.add(head);
+
+            const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const eyeGeometry = new THREE.SphereGeometry(0.06, 8, 8);
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.12, 1.2, -0.3);
+            rabbit.add(leftEye);
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.12, 1.2, -0.3);
+            rabbit.add(rightEye);
+            
+            const noseMaterial = new THREE.MeshStandardMaterial({color: 0xffc0cb, roughness: 0.5});
+            const noseGeometry = new THREE.SphereGeometry(0.04, 8, 8);
+            const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+            nose.position.set(0, 1.15, -0.33);
+            rabbit.add(nose);
+
+
+            const earGeometry = new THREE.CylinderGeometry(0.08, 0.05, 0.8, 8);
+            earGeometry.translate(0, 0.4, 0); 
+            const leftEar = new THREE.Mesh(earGeometry, bodyMaterial);
+            leftEar.position.set(-0.15, 1.4, 0);
+            leftEar.rotation.z = -Math.PI / 8;
+            leftEar.rotation.x = Math.PI / 10;
+            rabbit.add(leftEar);
+            const rightEar = new THREE.Mesh(earGeometry, bodyMaterial);
+            rightEar.position.set(0.15, 1.4, 0);
+            rightEar.rotation.z = Math.PI / 8;
+            rightEar.rotation.x = Math.PI / 10;
+            rabbit.add(rightEar);
+            rabbit.userData.ears = [leftEar, rightEar];
+
+
+            const legMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+            const legGeometry = new THREE.BoxGeometry(0.15, 0.6, 0.15);
+            
+            const frontLeftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            frontLeftLeg.position.set(-0.2, 0.3, -0.2);
+            rabbit.add(frontLeftLeg);
+            const frontRightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            frontRightLeg.position.set(0.2, 0.3, -0.2);
+            rabbit.add(frontRightLeg);
+            
+            const backLeftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            backLeftLeg.position.set(-0.2, 0.3, 0.2);
+            rabbit.add(backLeftLeg);
+            const backRightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            backRightLeg.position.set(0.2, 0.3, 0.2);
+            rabbit.add(backRightLeg);
+            
+            rabbit.userData.legs = [frontLeftLeg, frontRightLeg, backLeftLeg, backRightLeg];
+            rabbit.userData.legMovement = 0;
+            rabbit.position.y = groundY;
+        }
+
+
+        function addPathSegment(zPos) {
+            const pathMaterial = new THREE.MeshStandardMaterial({
+                color: 0x90EE90, 
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const segmentGeometry = new THREE.BoxGeometry(gameConfig.laneWidth * 3, 0.2, gameConfig.pathSegmentLength);
+            const segment = new THREE.Mesh(segmentGeometry, pathMaterial);
+            segment.position.set(0, -0.1, zPos); 
+            segment.receiveShadow = true;
+            scene.add(segment);
+            pathSegments.push(segment);
+
+            if (zPos < -10) { 
+                if (Math.random() < gameConfig.obstacleSpawnChance) {
+                    spawnRock(zPos);
+                } else if (Math.random() < gameConfig.collectibleSpawnChance) {
+                    spawnCarrot(zPos);
+                }
+            }
+        }
+
+        function spawnRock(zPos) { 
+            const rockMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x808080, 
+                roughness: 0.9, 
+                metalness: 0.2 
+            });
+            let size = (Math.random() * 0.4 + gameConfig.obstacleBaseSize) * 0.9; 
+            if (isNaN(size) || size <= 0) {
+                size = 0.4; 
+            }
+            const rockGeometry = new THREE.IcosahedronGeometry(size, Math.floor(Math.random() * 2)); 
+            const positionAttribute = rockGeometry.attributes.position;
+            for (let i = 0; i < positionAttribute.count; i++) {
+                const x = positionAttribute.getX(i);
+                const y = positionAttribute.getY(i);
+                const z_ = positionAttribute.getZ(i); 
+                const noiseFactor = 0.4; 
+                positionAttribute.setXYZ(
+                    i,
+                    x + (Math.random() - 0.5) * noiseFactor * size,
+                    y + (Math.random() - 0.5) * noiseFactor * size,
+                    z_ + (Math.random() - 0.5) * noiseFactor * size 
+                );
+            }
+            rockGeometry.computeVertexNormals();
+
+            const obstacle = new THREE.Mesh(rockGeometry, rockMaterial);
+            const lane = Math.floor(Math.random() * 3) - 1; 
+            obstacle.position.set(lane * gameConfig.laneWidth, size * 0.5, zPos); 
+            obstacle.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI); 
+            obstacle.castShadow = true;
+            obstacles.push(obstacle);
+            scene.add(obstacle);
+        }
+
+        function spawnCarrot(zPos) { 
+            const carrotGroup = new THREE.Group();
+            const carrotBodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFFD700, 
+                emissive: 0xccaa00, 
+                roughness:0.4, 
+                metalness:0.6 
+            });
+            const carrotBodyGeom = new THREE.ConeGeometry(0.2, 0.8, 8); 
+            const carrotBody = new THREE.Mesh(carrotBodyGeom, carrotBodyMaterial);
+            carrotBody.rotation.x = Math.PI / 2;
+            carrotGroup.add(carrotBody);
+            
+            const carrotLeavesMaterial = new THREE.MeshStandardMaterial({ color: 0x32CD32, roughness: 0.7 }); 
+            const leavesGeom = new THREE.SphereGeometry(0.15, 5, 4);
+            for(let i=0; i<3; i++){
+                const leaf = new THREE.Mesh(leavesGeom, carrotLeavesMaterial);
+                leaf.position.set( (Math.random()-0.5)*0.1, (Math.random()-0.5)*0.1, -0.35 + (Math.random()-0.5)*0.1);
+                leaf.scale.set(Math.random()*0.5+0.8, Math.random()*0.5+0.8, Math.random()*0.5+0.8);
+                carrotGroup.add(leaf);
+            }
+
+            const lane = Math.floor(Math.random() * 3) - 1;
+            carrotGroup.position.set(lane * gameConfig.laneWidth, 0.4, zPos); 
+            carrotGroup.rotation.z = Math.PI / 2; 
+            carrotGroup.userData.isCollectible = true;
+            carrotGroup.userData.bobOffset = Math.random() * Math.PI * 2; 
+            collectibles.push(carrotGroup);
+            scene.add(carrotGroup);
+        }
+
+        function handleKeyDown(e) {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            if ( (key === 'arrowleft' || key === 'arrowright') && gameRunning && audioInitialized && sideJumpSound && Tone.Transport.state === "started" ) {
+                sideJumpSound.triggerAttackRelease("A4", "16n");
+            }
+            if (key === ' ' && !isJumping && gameRunning) { 
+                performJump();
+            }
+        }
+        function handleKeyUp(e) {
+            const key = e.key.toLowerCase();
+             keys[key] = false;
+        }
+        function setupMobileControls() {
+            const btnLeft = document.getElementById('btnLeft');
+            const btnRight = document.getElementById('btnRight');
+            const btnJump = document.getElementById('btnJump');
+
+            btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameRunning && audioInitialized && sideJumpSound && Tone.Transport.state === "started") sideJumpSound.triggerAttackRelease("A4", "16n"); keys['arrowleft'] = true;  }, { passive: false });
+            btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); keys['arrowleft'] = false;}, { passive: false }); 
+            btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameRunning && audioInitialized && sideJumpSound && Tone.Transport.state === "started") sideJumpSound.triggerAttackRelease("A4", "16n"); keys['arrowright'] = true; }, { passive: false });
+            btnRight.addEventListener('touchend', (e) => { e.preventDefault(); keys['arrowright'] = false; }, { passive: false }); 
+            btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); if (!isJumping && gameRunning) performJump(); }, { passive: false });
+        }
+
+        function performJump() {
+            if (!isJumping && gameRunning) { 
+                isJumping = true;
+                rabbitYSpeed = jumpPower;
+                if (audioInitialized && jumpSound && Tone.Transport.state === "started") jumpSound.triggerAttackRelease("C5", "16n"); 
+                rabbit.userData.ears.forEach(ear => ear.rotation.x = Math.PI / 3);
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function updateGame(deltaTime) {
+            if (typeof deltaTime !== 'number' || deltaTime <= 0 || deltaTime > 0.1) { 
+                deltaTime = 1/60; 
+            }
+            if (!gameRunning || !rabbit) return;
+
+            const localElapsedTime = elapsedTime + deltaTime; 
+            elapsedTime = localElapsedTime; 
+
+            if (localElapsedTime - lastSpeedIncreaseTime > speedIncreaseInterval / 1000) { 
+                const nextFib = fibA + fibB;
+                fibA = fibB;
+                fibB = nextFib;
+                currentSpeedMultiplier = 1.0 + (fibB * 0.05); 
+                gameConfig.currentForwardSpeed = gameConfig.baseForwardSpeed * currentSpeedMultiplier;
+                lastSpeedIncreaseTime = localElapsedTime;
+            }
+
+            const moveZ = gameConfig.currentForwardSpeed * deltaTime; 
+            rabbit.position.z -= moveZ;
+            distanceTraveled += moveZ;
+
+            camera.position.z = rabbit.position.z + 7; 
+            camera.position.y = rabbit.position.y + 4; 
+            camera.lookAt(rabbit.position.x, rabbit.position.y + 0.5, rabbit.position.z - 3); 
+
+            if (isJumping) {
+                rabbit.position.y += rabbitYSpeed * deltaTime;
+                rabbitYSpeed -= gravity * deltaTime; 
+                if (rabbit.position.y <= groundY) {
+                    rabbit.position.y = groundY;
+                    isJumping = false;
+                    rabbitYSpeed = 0;
+                    rabbit.userData.ears.forEach(ear => ear.rotation.x = Math.PI / 10);
+                }
+            }
+
+            const slideStep = gameConfig.sideJumpSpeed * deltaTime; 
+            
+            if (keys['arrowleft']) {
+                if (gameConfig.rabbitLane > -1) { 
+                    gameConfig.rabbitLane--;
+                }
+                keys['arrowleft'] = false; 
+            } else if (keys['arrowright']) {
+                 if (gameConfig.rabbitLane < 1) { 
+                    gameConfig.rabbitLane++;
+                }
+                keys['arrowright'] = false; 
+            }
+            
+            const targetX = gameConfig.rabbitLane * gameConfig.laneWidth;
+            if (Math.abs(rabbit.position.x - targetX) > 0.01) { 
+                rabbit.position.x = THREE.MathUtils.lerp(rabbit.position.x, targetX, 0.2); 
+            } else {
+                rabbit.position.x = targetX;
+            }
+
+            if (!isJumping) {
+                rabbit.userData.legMovement += deltaTime * 15 * (gameConfig.currentForwardSpeed / gameConfig.baseForwardSpeed); 
+                rabbit.userData.legs[0].rotation.x = Math.sin(rabbit.userData.legMovement) * 0.4;
+                rabbit.userData.legs[1].rotation.x = Math.sin(rabbit.userData.legMovement + Math.PI) * 0.4;
+                rabbit.userData.legs[2].rotation.x = Math.sin(rabbit.userData.legMovement + Math.PI) * 0.4;
+                rabbit.userData.legs[3].rotation.x = Math.sin(rabbit.userData.legMovement) * 0.4;
+                 rabbit.userData.ears.forEach(ear => ear.rotation.z = Math.sin(localElapsedTime * 10) * 0.05 + (ear === rabbit.userData.ears[0] ? -Math.PI / 8 : Math.PI / 8) );
+            }
+
+
+            const lastSegmentZ = pathSegments.length > 0 ? pathSegments[pathSegments.length - 1].position.z : 0;
+            if (rabbit.position.z < lastSegmentZ + (gameConfig.pathSegmentsAhead - 15) * gameConfig.pathSegmentLength) { 
+                for (let i = 0; i < 10; i++) { 
+                     addPathSegment(lastSegmentZ - (i + 1) * gameConfig.pathSegmentLength);
+                }
+            }
+            if (pathSegments.length > 0 && pathSegments[0].position.z > rabbit.position.z + gameConfig.pathSegmentsBehind * gameConfig.pathSegmentLength) {
+                const oldSegment = pathSegments.shift();
+                scene.remove(oldSegment);
+            }
+
+            const rabbitBox = new THREE.Box3().setFromObject(rabbit); 
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obstacle = obstacles[i];
+                if (obstacle.position.z > rabbit.position.z + 10) continue; 
+                const obstacleBox = new THREE.Box3().setFromObject(obstacle);
+                if (rabbitBox.intersectsBox(obstacleBox)) {
+                    const rabbitBottomY = rabbit.position.y - gameConfig.rabbitBoundingRadius; 
+                    const obstacleBoundingBox = new THREE.Box3().setFromObject(obstacle); 
+                    const obstacleTopY = obstacleBoundingBox.max.y;
+
+                    if (!(isJumping && rabbitBottomY > obstacleTopY - 0.1)) { 
+                        if (gameRunning && audioInitialized && crashRockSound && Tone.Transport.state === "started") {
+                           crashRockSound.triggerAttackRelease("8n"); 
+                        }
+                        lives--;
+                        carrotForNextHeart = 0; 
+                        updateLivesDisplay();
+                        
+                        gameContainer.style.animation = 'shake 0.3s';
+                        setTimeout(() => gameContainer.style.animation = '', 300);
+
+                        scene.remove(obstacle);
+                        obstacles.splice(i, 1);
+                        if (lives <= 0) {
+                           gameOver();
+                        }
+                    }
+                } else if (obstacle.position.z > camera.position.z + 10) { 
+                    scene.remove(obstacle);
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                const collectible = collectibles[i];
+                if (collectible.position.z > rabbit.position.z + 10) continue;
+                collectible.position.y = 0.6 + Math.sin(localElapsedTime * 4 + collectible.userData.bobOffset) * 0.25; 
+                collectible.rotation.y += 0.08 * (deltaTime*60); 
+
+                const collectibleBox = new THREE.Box3().setFromObject(collectible);
+                if (rabbitBox.intersectsBox(collectibleBox)) {
+                    if (gameRunning && audioInitialized && collectCarrotSound && Tone.Transport.state === "started") {
+                        collectCarrotSound.triggerAttackRelease("A5", "16n"); 
+                    }
+                    score++;
+                    updateScoreDisplay();
+                    
+                    carrotForNextHeart += 0.5; 
+                    if (carrotForNextHeart >= 1) { 
+                        if (lives < MAX_LIVES) { 
+                            lives++;
+                        }
+                        carrotForNextHeart = 0; 
+                    }
+                    updateLivesDisplay(); 
+
+                    scene.remove(collectible);
+                    collectibles.splice(i, 1);
+                } else if (collectible.position.z > camera.position.z + 10) {
+                    scene.remove(collectible);
+                    collectibles.splice(i, 1);
+                }
+            }
+
+            manageDistantScenery(); // 배경 요소 관리 함수 호출
+            updateDistanceDisplay();
+        }
+
+        function updateScoreDisplay() { scoreDisplay.textContent = `당근: ${score}`; }
+        function updateDistanceDisplay() { 
+            if(distanceDisplay) { 
+                distanceDisplay.textContent = `${Math.floor(distanceTraveled)}m`; 
+            }
+        } 
+        function updateLivesDisplay() {
+            let hearts = "";
+            let currentFullHearts = Math.floor(lives); 
+            let hasHalfHeart = (lives - currentFullHearts) >= 0.5;
+
+            for (let i = 0; i < currentFullHearts; i++) hearts += "❤️";
+            if (hasHalfHeart && currentFullHearts < MAX_LIVES) hearts += "🧡"; 
+            for (let i = 0; i < MAX_LIVES - Math.ceil(lives); i++) hearts += "🤍"; 
+            
+            livesDisplay.textContent = `생명: ${hearts}`;
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            finalScoreDisplay.textContent = `최종 당근: ${score}`;
+            finalDistanceDisplay.textContent = `최종 거리: ${Math.floor(distanceTraveled)}m`;
+            gameOverScreen.style.display = 'flex';
+            if (audioInitialized && Tone.Transport.state === "started") Tone.Transport.stop();
+            if (audioInitialized && slideSound && slideSound.state === "started") slideSound.triggerRelease();
+        }
+
+        function animate() {
+            if (!gameRunning) {
+                return;
+            }
+            requestAnimationFrame(animate);
+
+            let deltaTime = clock.getDelta();
+            deltaTime = Math.min(deltaTime, 0.1); 
+            
+            if (deltaTime > 0) { 
+                updateGame(deltaTime);
+            }
+            renderer.render(scene, camera);
+        }
+        
+        init(); 
+    </script>
+</body>
+</html>
