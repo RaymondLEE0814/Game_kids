@@ -195,7 +195,7 @@
         var pathSegments = [];
         var obstacles = [], collectibles = [];
         var carrotForNextHeart = 0; 
-        var distantSceneryElements = []; // 배경 요소 관리 배열
+        var distantSceneryElements = []; 
 
         var rabbitYSpeed = 0;
         const gravity = 30; 
@@ -252,8 +252,8 @@
             obstacleBaseSize: 0.4, 
             collectibleBoundingRadius: 0.3,
             worldDepth: 0, 
-            scenerySpawnZDistance: 50, // 새로운 배경 요소가 생성될 Z 거리
-            sceneryRemoveZDistance: 20, // 오래된 배경 요소가 제거될 Z 거리 (카메라 뒤)
+            scenerySpawnZDistance: 50, 
+            sceneryRemoveZDistance: 20, 
         };
 
         async function initializeAudio() {
@@ -270,7 +270,7 @@
                 }).toDestination();
             
                 const part = new Tone.Part((time, value) => {
-                    if(mainSynth) mainSynth.triggerAttackRelease(value.note, value.duration, time);
+                    if(mainSynth && Tone.Transport.state === "started") mainSynth.triggerAttackRelease(value.note, value.duration, time);
                 }, newMusicPattern).start(0);
                 part.loop = true;
                 part.loopEnd = "4m"; 
@@ -311,7 +311,7 @@
         audioStartMessage.addEventListener('click', initializeAudio, { once: true });
 
         function init() {
-            gameConfig.worldDepth = gameConfig.pathSegmentsAhead * gameConfig.pathSegmentLength * 2.5; // worldDepth 초기화 위치 변경
+            gameConfig.worldDepth = gameConfig.pathSegmentsAhead * gameConfig.pathSegmentLength * 2.5; 
 
             score = 0; lives = MAX_LIVES; distanceTraveled = 0; gameRunning = true; elapsedTime = 0;
             carrotForNextHeart = 0; 
@@ -388,11 +388,9 @@
                 addPathSegment(i * gameConfig.pathSegmentLength);
             }
             
-            // 초기 배경 생성
-            for(let i=0; i < 5; i++) { // 초기에는 몇 개만 미리 생성
+            for(let i=0; i < 5; i++) { 
                 createRandomSceneryElement(rabbit.position.z - i * (gameConfig.scenerySpawnZDistance/3) );
             }
-
 
             window.addEventListener('keydown', handleKeyDown);
             window.addEventListener('keyup', handleKeyUp);
@@ -405,9 +403,9 @@
         }
         
         function createRandomSceneryElement(zPos) {
-            const sceneryType = Math.random() < 0.6 ? 'hill' : 'tree'; // 60% 확률로 언덕, 40% 확률로 나무
+            const sceneryType = Math.random() < 0.6 ? 'hill' : 'tree'; 
             let element;
-            let xPositionOffset = gameConfig.laneWidth * 2.0 + Math.random() * 30 + 15; // 길 바깥쪽에 생성되도록 최소 거리 확보
+            let xPositionOffset = gameConfig.laneWidth * 2.5 + Math.random() * 40 + 20; // 길 바깥쪽 최소 거리 증가
             let xPosition = (Math.random() < 0.5 ? -1 : 1) * xPositionOffset;
 
 
@@ -436,30 +434,26 @@
                 element.add(leaves);
                 element.position.set(xPosition, trunkHeight / 2 - 0.2, zPos);
             }
-            element.userData.isScenery = true; // 배경 요소 식별자
+            element.userData.isScenery = true; 
             scene.add(element);
             distantSceneryElements.push(element);
         }
 
         function manageDistantScenery() {
             if (!rabbit) return;
-            // 새로운 배경 요소 생성
-            // 토끼가 특정 거리만큼 전진했을 때 새로운 배경 요소를 생성하도록 조건을 설정할 수 있습니다.
-            // 여기서는 마지막 배경 요소의 Z 위치를 기준으로 새로운 요소를 추가합니다.
             let lastSceneryZ = distantSceneryElements.length > 0 ? 
                                 distantSceneryElements[distantSceneryElements.length-1].position.z : 
                                 rabbit.position.z - gameConfig.scenerySpawnZDistance;
 
-            if (rabbit.position.z < lastSceneryZ + gameConfig.scenerySpawnZDistance * 0.8) { // 마지막 배경 요소보다 충분히 앞에 갔을 때
-                 for(let i=0; i<2; i++){ // 한 번에 여러 개 생성 가능
-                    createRandomSceneryElement(rabbit.position.z - gameConfig.scenerySpawnZDistance - Math.random() * 20);
+            if (rabbit.position.z < lastSceneryZ + gameConfig.scenerySpawnZDistance * 0.7) { // 생성 조건 조정
+                 for(let i=0; i<2; i++){ 
+                    createRandomSceneryElement(rabbit.position.z - gameConfig.scenerySpawnZDistance - Math.random() * 30); // Z 위치 다양성 증가
                  }
             }
 
-            // 오래된 배경 요소 제거
             for (let i = distantSceneryElements.length - 1; i >= 0; i--) {
                 const element = distantSceneryElements[i];
-                if (element.position.z > camera.position.z + gameConfig.sceneryRemoveZDistance) { // 카메라 뒤로 충분히 멀어졌을 때
+                if (element.position.z > camera.position.z + gameConfig.sceneryRemoveZDistance + 20) { // 제거 거리 약간 늘림
                     scene.remove(element);
                     if (element.geometry) element.geometry.dispose();
                     if (element.material) {
@@ -477,7 +471,6 @@
 
         function createRabbit() {
             rabbit = new THREE.Group();
-            // 토끼 모델 생성 코드는 이전과 동일하게 유지
             const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
             const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
             bodyGeometry.scale(1, 1.2, 0.9); 
@@ -623,6 +616,14 @@
                 leaf.scale.set(Math.random()*0.5+0.8, Math.random()*0.5+0.8, Math.random()*0.5+0.8);
                 carrotGroup.add(leaf);
             }
+            
+            // 충돌 감지용 투명 구체 추가
+            const collisionSphereGeometry = new THREE.SphereGeometry(gameConfig.collectibleBoundingRadius * 1.2, 8, 8); // 시각적 모델보다 약간 크게
+            const collisionMaterial = new THREE.MeshBasicMaterial({transparent: true, opacity: 0, wireframe: false}); // 완전 투명
+            const collisionSphere = new THREE.Mesh(collisionSphereGeometry, collisionMaterial);
+            // carrotGroup의 중심에 위치하도록 (필요시 carrotBody.position 기준으로 조정)
+            carrotGroup.add(collisionSphere);
+
 
             const lane = Math.floor(Math.random() * 3) - 1;
             carrotGroup.position.set(lane * gameConfig.laneWidth, 0.4, zPos); 
@@ -637,7 +638,7 @@
             const key = e.key.toLowerCase();
             keys[key] = true;
             if ( (key === 'arrowleft' || key === 'arrowright') && gameRunning && audioInitialized && sideJumpSound && Tone.Transport.state === "started" ) {
-                sideJumpSound.triggerAttackRelease("A4", "16n");
+                if (sideJumpSound.state === "stopped") sideJumpSound.triggerAttackRelease("A4", "16n");
             }
             if (key === ' ' && !isJumping && gameRunning) { 
                 performJump();
@@ -652,9 +653,9 @@
             const btnRight = document.getElementById('btnRight');
             const btnJump = document.getElementById('btnJump');
 
-            btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameRunning && audioInitialized && sideJumpSound && Tone.Transport.state === "started") sideJumpSound.triggerAttackRelease("A4", "16n"); keys['arrowleft'] = true;  }, { passive: false });
+            btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameRunning && audioInitialized && sideJumpSound && Tone.Transport.state === "started" && sideJumpSound.state === "stopped") sideJumpSound.triggerAttackRelease("A4", "16n"); keys['arrowleft'] = true;  }, { passive: false });
             btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); keys['arrowleft'] = false;}, { passive: false }); 
-            btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameRunning && audioInitialized && sideJumpSound && Tone.Transport.state === "started") sideJumpSound.triggerAttackRelease("A4", "16n"); keys['arrowright'] = true; }, { passive: false });
+            btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); if(gameRunning && audioInitialized && sideJumpSound && Tone.Transport.state === "started" && sideJumpSound.state === "stopped") sideJumpSound.triggerAttackRelease("A4", "16n"); keys['arrowright'] = true; }, { passive: false });
             btnRight.addEventListener('touchend', (e) => { e.preventDefault(); keys['arrowright'] = false; }, { passive: false }); 
             btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); if (!isJumping && gameRunning) performJump(); }, { passive: false });
         }
@@ -726,10 +727,10 @@
             }
             
             const targetX = gameConfig.rabbitLane * gameConfig.laneWidth;
-            if (Math.abs(rabbit.position.x - targetX) > 0.01) { 
-                rabbit.position.x = THREE.MathUtils.lerp(rabbit.position.x, targetX, 0.2); 
+            if (Math.abs(rabbit.position.x - targetX) > 0.01) { // 스냅 임계값 조정
+                rabbit.position.x = THREE.MathUtils.lerp(rabbit.position.x, targetX, 0.35); // Lerp 알파 값 증가
             } else {
-                rabbit.position.x = targetX;
+                rabbit.position.x = targetX; 
             }
 
             if (!isJumping) {
@@ -793,7 +794,7 @@
                 collectible.position.y = 0.6 + Math.sin(localElapsedTime * 4 + collectible.userData.bobOffset) * 0.25; 
                 collectible.rotation.y += 0.08 * (deltaTime*60); 
 
-                const collectibleBox = new THREE.Box3().setFromObject(collectible);
+                const collectibleBox = new THREE.Box3().setFromObject(collectible); // 충돌 감지용 구체를 포함한 박스
                 if (rabbitBox.intersectsBox(collectibleBox)) {
                     if (gameRunning && audioInitialized && collectCarrotSound && Tone.Transport.state === "started") {
                         collectCarrotSound.triggerAttackRelease("A5", "16n"); 
@@ -818,7 +819,7 @@
                 }
             }
 
-            manageDistantScenery(); // 배경 요소 관리 함수 호출
+            manageDistantScenery(); 
             updateDistanceDisplay();
         }
 
